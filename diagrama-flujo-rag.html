@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagrama de Flujo - Sistema RAG</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .diagram-section {
+            margin-bottom: 50px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        .diagram-title {
+            font-size: 1.8em;
+            color: #444;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        .mermaid {
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .legend {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border-left: 4px solid #ffc107;
+        }
+        .legend h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .legend ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .legend li {
+            margin: 5px 0;
+            color: #856404;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1.1em;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .tab:hover {
+            color: #667eea;
+        }
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Sistema RAG - Flujo de Procesamiento</h1>
+        <p class="subtitle">Diagrama interactivo del flujo desde la pregunta del usuario hasta la respuesta</p>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('sequence')">📊 Diagrama de Secuencia</button>
+            <button class="tab" onclick="showTab('architecture')">🏗️ Arquitectura de Componentes</button>
+            <button class="tab" onclick="showTab('detailed')">🔍 Flujo Detallado</button>
+        </div>
+
+        <!-- Diagrama de Secuencia -->
+        <div id="sequence" class="tab-content active">
+            <div class="diagram-section">
+                <h2 class="diagram-title">Diagrama de Secuencia - Interacciones entre Componentes</h2>
+                <div class="mermaid">
+sequenceDiagram
+    participant User as 👤 Usuario
+    participant Frontend as 🌐 Frontend
+    participant API as 🔌 FastAPI
+    participant RAG as 🎯 RAGSystem
+    participant Session as 💾 SessionManager
+    participant AI as 🤖 AIGenerator
+    participant Tools as 🔧 ToolManager
+    participant Search as 🔍 SearchTool
+    participant Vector as 📊 VectorStore
+    participant Chroma as 🗄️ ChromaDB
+
+    User->>Frontend: Escribe pregunta
+    Frontend->>API: POST /api/query
+
+    rect rgb(240, 248, 255)
+        Note over API,RAG: 1. Inicialización
+        API->>RAG: query(pregunta, session_id)
+        RAG->>Session: get_conversation_history()
+        Session-->>RAG: historial
+    end
+
+    rect rgb(255, 250, 240)
+        Note over RAG,AI: 2. Primera llamada a Claude
+        RAG->>AI: generate_response()
+        AI->>AI: Preparar prompt con historial
+        AI->>Anthropic: API Call con tools
+        Anthropic-->>AI: tool_use request
+    end
+
+    rect rgb(240, 255, 240)
+        Note over AI,Chroma: 3. Búsqueda Vectorial
+        AI->>Tools: execute_tool("search")
+        Tools->>Search: execute(params)
+        Search->>Vector: search(query, filters)
+
+        alt Resolver nombre de curso
+            Vector->>Chroma: query(course_catalog)
+            Chroma-->>Vector: título exacto
+        end
+
+        Vector->>Chroma: query(course_content)
+        Note over Chroma: Búsqueda semántica<br/>con embeddings
+        Chroma-->>Vector: Top N chunks
+        Vector-->>Search: SearchResults
+        Search->>Search: Formatear + guardar sources
+        Search-->>AI: resultados
+    end
+
+    rect rgb(255, 245, 240)
+        Note over AI: 4. Generar Respuesta
+        AI->>Anthropic: API Call con tool_results
+        Anthropic-->>AI: respuesta final
+    end
+
+    rect rgb(250, 240, 255)
+        Note over RAG,Session: 5. Guardar y Retornar
+        AI-->>RAG: respuesta
+        RAG->>Tools: get_last_sources()
+        Tools-->>RAG: sources
+        RAG->>Session: add_exchange()
+        RAG-->>API: (answer, sources)
+    end
+
+    API-->>Frontend: JSON Response
+    Frontend-->>User: Mostrar respuesta
+                </div>
+
+                <div class="legend">
+                    <h3>💡 Leyenda del Flujo</h3>
+                    <ul>
+                        <li><strong>Azul:</strong> Inicialización y recuperación de contexto</li>
+                        <li><strong>Naranja:</strong> Primera interacción con Claude (decisión de usar herramientas)</li>
+                        <li><strong>Verde:</strong> Ejecución de búsqueda vectorial en ChromaDB</li>
+                        <li><strong>Rosa:</strong> Segunda llamada a Claude con contexto para generar respuesta</li>
+                        <li><strong>Púrpura:</strong> Almacenamiento de historial y retorno de respuesta</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Arquitectura de Componentes -->
+        <div id="architecture" class="tab-content">
+            <div class="diagram-section">
+                <h2 class="diagram-title">Arquitectura de Componentes - Vista de Capas</h2>
+                <div class="mermaid">
+graph TB
+    subgraph FrontendLayer["FRONTEND LAYER"]
+        UI["Interfaz Web - HTML/CSS/JavaScript"]
+    end
+
+    subgraph APILayer["API LAYER"]
+        FastAPI["FastAPI Server - app.py - Endpoints REST"]
+    end
+
+    subgraph OrchestrationLayer["ORCHESTRATION LAYER"]
+        RAG["RAG System - rag_system.py - Coordinador principal"]
+        Session["Session Manager - session_manager.py - Gestión de conversaciones"]
+    end
+
+    subgraph AILayerGroup["AI LAYER"]
+        AI["AI Generator - ai_generator.py - Interfaz con Claude"]
+        Anthropic["Anthropic API - Claude Sonnet 4.5"]
+    end
+
+    subgraph ToolsLayer["TOOL LAYER"]
+        ToolMgr["Tool Manager - Registro y ejecución"]
+        SearchTool["Course Search Tool - Búsqueda semántica"]
+    end
+
+    subgraph DataLayer["DATA LAYER"]
+        Vector["Vector Store - vector_store.py - Gestión de embeddings"]
+        DocProc["Document Processor - document_processor.py - Procesamiento de docs"]
+    end
+
+    subgraph StorageLayer["STORAGE LAYER"]
+        Chroma["ChromaDB - Base de datos vectorial"]
+        CatalogDB["course_catalog - Metadata de cursos"]
+        ContentDB["course_content - Contenido en chunks"]
+    end
+
+    UI -->|HTTP POST| FastAPI
+    FastAPI -->|Delega query| RAG
+    RAG -->|Gestiona contexto| Session
+    RAG -->|Genera respuesta| AI
+    RAG -->|Coordina búsqueda| ToolMgr
+
+    AI <-->|Tool Use Protocol| Anthropic
+    AI -->|Ejecuta herramientas| ToolMgr
+
+    ToolMgr -->|Invoca| SearchTool
+    SearchTool -->|Busca vectores| Vector
+
+    Vector -->|Consulta| Chroma
+    Chroma -.->|Colección| CatalogDB
+    Chroma -.->|Colección| ContentDB
+
+    DocProc -.->|Carga inicial| Vector
+
+    style FrontendLayer fill:#e1f5ff,stroke:#0288d1,stroke-width:3px
+    style APILayer fill:#fff4e1,stroke:#ff9800,stroke-width:3px
+    style OrchestrationLayer fill:#ffe1f5,stroke:#e91e63,stroke-width:3px
+    style AILayerGroup fill:#f5e1ff,stroke:#9c27b0,stroke-width:3px
+    style ToolsLayer fill:#e1ffe8,stroke:#4caf50,stroke-width:3px
+    style DataLayer fill:#fff9e1,stroke:#ffc107,stroke-width:3px
+    style StorageLayer fill:#ffe1e1,stroke:#f44336,stroke-width:3px
+                </div>
+
+                <div class="legend">
+                    <h3>💡 Capas del Sistema</h3>
+                    <ul>
+                        <li><strong>Frontend Layer:</strong> Interfaz de usuario web</li>
+                        <li><strong>API Layer:</strong> Endpoints REST con FastAPI</li>
+                        <li><strong>Orchestration Layer:</strong> Coordinación del sistema RAG y sesiones</li>
+                        <li><strong>AI Layer:</strong> Integración con Claude AI</li>
+                        <li><strong>Tool Layer:</strong> Herramientas de búsqueda disponibles para la IA</li>
+                        <li><strong>Data Layer:</strong> Procesamiento y gestión de vectores</li>
+                        <li><strong>Storage Layer:</strong> Persistencia en ChromaDB</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Flujo Detallado -->
+        <div id="detailed" class="tab-content">
+            <div class="diagram-section">
+                <h2 class="diagram-title">Flujo Detallado - Paso a Paso con Archivos</h2>
+                <div class="mermaid">
+flowchart TD
+    Start([👤 Usuario ingresa pregunta]) --> FE[🌐 Frontend Web]
+
+    FE -->|POST /api/query| API[🔌 app.py:56<br/>async def query_documents]
+
+    API --> CheckSession{¿Existe<br/>session_id?}
+    CheckSession -->|No| CreateSession[session_manager.py<br/>create_session]
+    CheckSession -->|Sí| UseSession[Usar session_id]
+    CreateSession --> CallRAG
+    UseSession --> CallRAG
+
+    CallRAG[rag_system.py:102<br/>query método] --> GetHistory[session_manager.py<br/>get_conversation_history]
+
+    GetHistory --> PreparePrompt[rag_system.py:114<br/>Preparar prompt]
+
+    PreparePrompt --> CallAI[ai_generator.py:43<br/>generate_response]
+
+    CallAI --> BuildSystem[ai_generator.py:61-65<br/>Construir system prompt<br/>+ historial]
+
+    BuildSystem --> FirstAPI[ai_generator.py:80<br/>Anthropic API Call #1<br/>con tools disponibles]
+
+    FirstAPI --> ClaudeDecision{Claude decide<br/>usar herramienta?}
+
+    ClaudeDecision -->|No| DirectAnswer[Respuesta directa<br/>sin búsqueda]
+
+    ClaudeDecision -->|Sí: tool_use| ExecuteTool[ai_generator.py:84<br/>_handle_tool_execution]
+
+    ExecuteTool --> ToolMgr[search_tools.py:135<br/>execute_tool]
+
+    ToolMgr --> SearchExec[search_tools.py:52<br/>CourseSearchTool.execute]
+
+    SearchExec --> VectorSearch[vector_store.py:61<br/>VectorStore.search]
+
+    VectorSearch --> ResolveCourse{¿Filtro por<br/>course_name?}
+
+    ResolveCourse -->|Sí| QueryCatalog[vector_store.py:105<br/>query course_catalog<br/>Búsqueda semántica del nombre]
+
+    QueryCatalog --> GetExactTitle[Obtener título exacto]
+
+    ResolveCourse -->|No| BuildFilter
+    GetExactTitle --> BuildFilter
+
+    BuildFilter[vector_store.py:118<br/>_build_filter<br/>Construir filtros WHERE] --> QueryContent[vector_store.py:93<br/>query course_content<br/>Búsqueda vectorial]
+
+    QueryContent --> Embeddings[ChromaDB<br/>Convertir query a embeddings<br/>Sentence Transformers]
+
+    Embeddings --> CosineSim[ChromaDB<br/>Similitud coseno<br/>Top N resultados]
+
+    CosineSim --> ReturnChunks[SearchResults<br/>documents, metadata, distances]
+
+    ReturnChunks --> FormatResults[search_tools.py:88<br/>_format_results<br/>Formatear con contexto]
+
+    FormatResults --> SaveSources[search_tools.py:112<br/>Guardar sources]
+
+    SaveSources --> SecondAPI[ai_generator.py:134<br/>Anthropic API Call #2<br/>con tool_results]
+
+    DirectAnswer --> ReturnToRAG
+    SecondAPI --> ReturnToRAG[Respuesta final de Claude]
+
+    ReturnToRAG --> GetSources[rag_system.py:130<br/>get_last_sources]
+
+    GetSources --> AddExchange[rag_system.py:137<br/>session_manager<br/>add_exchange]
+
+    AddExchange --> ReturnResponse[rag_system.py:140<br/>return answer, sources]
+
+    ReturnResponse --> APIResponse[app.py:68<br/>QueryResponse]
+
+    APIResponse --> DisplayUser[🌐 Frontend muestra<br/>respuesta + fuentes]
+
+    DisplayUser --> End([✅ Fin])
+
+    style Start fill:#4caf50,stroke:#2e7d32,color:#fff
+    style End fill:#4caf50,stroke:#2e7d32,color:#fff
+    style ClaudeDecision fill:#ff9800,stroke:#f57c00,color:#fff
+    style ResolveCourse fill:#2196f3,stroke:#1976d2,color:#fff
+    style QueryContent fill:#9c27b0,stroke:#7b1fa2,color:#fff
+    style CosineSim fill:#e91e63,stroke:#c2185b,color:#fff
+    style SecondAPI fill:#00bcd4,stroke:#0097a7,color:#fff
+                </div>
+
+                <div class="legend">
+                    <h3>💡 Archivos Clave</h3>
+                    <ul>
+                        <li><strong>app.py:</strong> Endpoint FastAPI que recibe la petición</li>
+                        <li><strong>rag_system.py:</strong> Orquestador principal del flujo RAG</li>
+                        <li><strong>ai_generator.py:</strong> Interfaz con la API de Anthropic (Claude)</li>
+                        <li><strong>search_tools.py:</strong> Herramienta de búsqueda con Tool Use</li>
+                        <li><strong>vector_store.py:</strong> Gestión de ChromaDB y búsquedas vectoriales</li>
+                        <li><strong>session_manager.py:</strong> Mantiene historial de conversaciones</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#667eea',
+                primaryTextColor: '#fff',
+                primaryBorderColor: '#5568d3',
+                lineColor: '#666',
+                secondaryColor: '#764ba2',
+                tertiaryColor: '#f8f9fa'
+            },
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            },
+            sequence: {
+                useMaxWidth: true,
+                width: 150
+            }
+        });
+
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>
