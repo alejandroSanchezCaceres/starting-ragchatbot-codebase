@@ -38,6 +38,10 @@ function setupEventListeners() {
             sendMessage();
         });
     });
+
+    // New chat button
+    const newChatBtn = document.getElementById('newChatBtn');
+    newChatBtn.addEventListener('click', handleNewChat);
 }
 
 
@@ -120,12 +124,23 @@ function addMessage(content, type, sources = null, isWelcome = false) {
     const displayContent = type === 'assistant' ? marked.parse(content) : escapeHtml(content);
     
     let html = `<div class="message-content">${displayContent}</div>`;
-    
+
     if (sources && sources.length > 0) {
+        // Convert sources to HTML links with better formatting
+        const sourceLinks = sources.map(source => {
+            if (source.url) {
+                // Clickable link for sources with URLs
+                return `<div class="source-item"><a href="${source.url}" target="_blank" rel="noopener noreferrer" class="source-link">${escapeHtml(source.text)}</a></div>`;
+            } else {
+                // Plain text for sources without URLs
+                return `<div class="source-item"><span class="source-text">${escapeHtml(source.text)}</span></div>`;
+            }
+        }).join('');
+
         html += `
             <details class="sources-collapsible">
                 <summary class="sources-header">Sources</summary>
-                <div class="sources-content">${sources.join(', ')}</div>
+                <div class="sources-content">${sourceLinks}</div>
             </details>
         `;
     }
@@ -150,6 +165,29 @@ async function createNewSession() {
     currentSessionId = null;
     chatMessages.innerHTML = '';
     addMessage('Welcome to the Course Materials Assistant! I can help you with questions about courses, lessons and specific content. What would you like to know?', 'assistant', null, true);
+}
+
+async function handleNewChat() {
+    // Clear backend session if one exists
+    if (currentSessionId) {
+        try {
+            await fetch('/api/clear_session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    session_id: currentSessionId
+                })
+            });
+        } catch (error) {
+            console.error('Error clearing session:', error);
+            // Continue anyway - frontend will reset
+        }
+    }
+
+    // Reset frontend state
+    createNewSession();
 }
 
 // Load course statistics

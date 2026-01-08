@@ -1,7 +1,7 @@
 import warnings
 warnings.filterwarnings("ignore", message="resource_tracker: There appear to be.*")
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -40,10 +40,15 @@ class QueryRequest(BaseModel):
     query: str
     session_id: Optional[str] = None
 
+class SourceItem(BaseModel):
+    """Model for a source citation with optional link"""
+    text: str
+    url: Optional[str] = None
+
 class QueryResponse(BaseModel):
     """Response model for course queries"""
     answer: str
-    sources: List[str]
+    sources: List[SourceItem]
     session_id: str
 
 class CourseStats(BaseModel):
@@ -82,6 +87,23 @@ async def get_course_stats():
             total_courses=analytics["total_courses"],
             course_titles=analytics["course_titles"]
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/clear_session")
+async def clear_session(request: Request):
+    """Clear conversation history for a session"""
+    try:
+        data = await request.json()
+        session_id = data.get("session_id")
+
+        if session_id:
+            rag_system.session_manager.clear_session(session_id)
+            return {"status": "success", "message": "Session cleared"}
+        else:
+            raise HTTPException(status_code=400, detail="No session_id provided")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
